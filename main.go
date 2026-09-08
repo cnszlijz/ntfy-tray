@@ -12,7 +12,9 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/getlantern/systray"
@@ -27,6 +29,13 @@ const (
 
 //go:embed icon.ico
 var iconData []byte
+
+//go:embed icon_blank.ico
+var iconBlank []byte
+
+// unseen counts notifications not yet acknowledged by a tray-icon click.
+// While > 0 the tray icon flashes.
+var unseen atomic.Int32
 
 var (
 	server = flag.String("server", "https://ntfy.sh", "ntfy server URL")
@@ -51,6 +60,7 @@ func main() {
 	if *topics == "" {
 		log.Fatal("-topics is required, e.g. -topics=mytopic,alerts")
 	}
+	initState()
 	systray.Run(onReady, onExit)
 }
 
@@ -65,6 +75,10 @@ func onReady() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go listenLoop(ctx)
+	go flasher(ctx)
+
+	// Left or right click on the icon acknowledges all pending notifications.
+	systray.SetOnTrayClick(func() { unseen.Store(0) })
 
 	go func() {
 		for {
@@ -81,6 +95,33 @@ func onReady() {
 }
 
 func onExit() {}
+
+// flasher alternates the tray icon between normal and blank every 500ms
+// while there are unacknowledged notifications.
+func flasher(ctx context.Context) {
+	t := time.NewTicker(500 * time.Millisecond)
+	defer t.Stop()
+	blank := false
+	for {
+		select {
+		case <-ctx.Done():
+			systray.SetIcon(iconData)
+			return
+		case <-t.C:
+			if unseen.Load() > 0 {
+				blank = !blank
+				if blank {
+					systray.SetIcon(iconBlank)
+				} else {
+					systray.SetIcon(iconData)
+				}
+			} else if blank {
+				blank = false
+				systray.SetIcon(iconData)
+			}
+		}
+	}
+}
 
 func openBrowser(url string) {
 	// No console window: -H=windowsgui build + rundll32 handles the open.
@@ -116,7 +157,13 @@ func listenLoop(ctx context.Context) {
 
 // stream opens one long-lived NDJSON subscription until error or cancel.
 func stream(ctx context.Context) error {
-	url := fmt.Sprintf("%s/%s/json?since=all", strings.TrimRight(*server, "/"), *topics)
+	// Resume from the oldest recorded watermark; per-topic dedupe below drops
+	// everything already shown. First run (no state): only new messages.
+	since := "all"
+	if min, ok := minStateTime(); ok {
+		since = strconv.FormatInt(min, 10)
+	}
+	url := fmt.Sprintf("%s/%s/json?since=%s", strings.TrimRight(*server, "/"), *topics, since)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -162,7 +209,11 @@ func stream(ctx context.Context) error {
 				continue
 			}
 			if msg.Event == "message" {
+				if msg.Time <= lastSeen(msg.Topic) {
+					continue // replayed history at or before the watermark
+				}
 				notify(msg)
+				markSeen(msg.Topic, msg.Time)
 			}
 			// "open"/"keepalive" frames only serve to reset the watchdog below.
 		case <-time.After(watchdogInterval):
@@ -197,4 +248,6 @@ func notify(msg ntfyMessage) {
 	if err := n.Push(); err != nil {
 		log.Printf("toast failed: %v", err)
 	}
+	log.Printf("notified: topic=%s title=%q", msg.Topic, title)
+	unseen.Add(1) // start flashing until the tray icon is clicked
 }
