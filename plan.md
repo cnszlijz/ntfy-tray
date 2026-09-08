@@ -42,7 +42,7 @@ Windows 常驻托盘程序：订阅 ntfy.sh topic，收到消息时弹出 Window
 
 - 图标：`icon.ico`（32×32，程序内 `go:embed`）。
 - 菜单：`Open ntfy`（浏览器打开 topic 页面）、`Quit`。
-- **闪烁**：有未确认通知时图标以 500ms 间隔在 `icon.ico` / `icon_blank.ico` 间切换；左键或右键单击图标即停止。上游 systray 无图标点击回调 → 库已 vendor 到 `internal/systray` 并打补丁新增 `SetOnTrayClick`（WndProc 的 `WM_LBUTTONUP/WM_RBUTTONUP` 分支触发），go.mod 用 `replace` 指向本地副本。
+- **闪烁**：有未确认通知时图标以 500ms 间隔在 `icon.ico` / `icon_blank.ico` 间切换。**左键单击仅消除闪烁（不弹菜单）**；右键单击消除闪烁并弹出菜单。上游 systray 无图标点击回调 → 库已 vendor 到 `internal/systray` 并打补丁新增 `SetOnTrayClick`（WndProc 的 `WM_LBUTTONUP` 分支只触发回调，`WM_RBUTTONUP` 分支触发回调 + `showMenu()`），go.mod 用 `replace` 指向本地副本。
 
 ## 运行参数
 

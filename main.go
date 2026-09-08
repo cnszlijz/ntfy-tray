@@ -78,7 +78,11 @@ func onReady() {
 	go flasher(ctx)
 
 	// Left or right click on the icon acknowledges all pending notifications.
-	systray.SetOnTrayClick(func() { unseen.Store(0) })
+	systray.SetOnTrayClick(func() {
+		if unseen.Swap(0) > 0 {
+			log.Printf("tray clicked: notifications acknowledged, flashing stopped")
+		}
+	})
 
 	go func() {
 		for {

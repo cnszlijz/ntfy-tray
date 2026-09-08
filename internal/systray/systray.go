@@ -27,7 +27,8 @@ var (
 )
 
 // SetOnTrayClick registers a callback invoked when the tray icon itself is
-// clicked (left or right button), in addition to the menu being shown.
+// clicked. On Windows a left click fires only this callback, while a right
+// click fires it and additionally shows the menu.
 // Currently implemented on Windows only.
 func SetOnTrayClick(fn func()) {
 	onTrayClick.Store(fn)

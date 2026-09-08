@@ -277,7 +277,12 @@ func (t *winTray) wndProc(hWnd windows.Handle, message uint32, wParam, lParam ui
 		systrayExit()
 	case t.wmSystrayMessage:
 		switch lParam {
-		case WM_RBUTTONUP, WM_LBUTTONUP:
+		case WM_LBUTTONUP:
+			// Left click: fire callback only (acknowledge), no menu.
+			if fn, ok := onTrayClick.Load().(func()); ok && fn != nil {
+				fn()
+			}
+		case WM_RBUTTONUP:
 			if fn, ok := onTrayClick.Load().(func()); ok && fn != nil {
 				fn()
 			}
