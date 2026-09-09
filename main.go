@@ -67,6 +67,7 @@ func main() {
 	}
 	log.Printf("starting ntfy-tray: server=%s topics=%s", *server, *topics)
 	initState()
+	ensureTopics(strings.Split(*topics, ","))
 	systray.Run(onReady, onExit)
 }
 

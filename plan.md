@@ -28,8 +28,8 @@ Windows 常驻托盘程序：订阅 ntfy.sh topic，收到消息时弹出 Window
 ### 断线续传（state.go）
 
 - `ntfy-tray-state.json` 存于 exe 同目录：`{"topics": {"<topic>": <unix 秒>}}`，记录每个 topic 最近一条已展示消息的时间戳；写盘用 tmp+rename 原子替换。
+- **启动即落盘**：启动时为所有无记录的订阅 topic 写入启动时间水印（`ensureTopics`）。否则首次运行未收到消息就被杀死时 topic 无状态，下次启动会将其当作新 topic，丢掉离线期间的消息。
 - 启动时 `since` 取所有 topic 水印的**最小值**（服务端补发历史），客户端按 `msg.Time <= 水印` 逐 topic 去重，仅展示上次更新后的通知。
-- 无状态的新 topic 以程序启动时间为水印，只收新消息。
 - 已知边界：水印精度为秒，与最后一条消息同秒发布的离线消息会被视为已读（ntfy 流不支持多 topic 分别指定 message ID，可接受）。
 
 ### Toast 行为

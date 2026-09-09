@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -51,6 +52,30 @@ func lastSeen(topic string) int64 {
 		return t
 	}
 	return startedAt
+}
+
+// ensureTopics records a startup watermark for every subscribed topic that
+// has no state yet. Without this, a kill before the first notification would
+// leave the topic stateless, and the next run would treat it as new and skip
+// messages published while the program was offline.
+func ensureTopics(topics []string) {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+	changed := false
+	for _, t := range topics {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		if _, ok := stateSeen[t]; !ok {
+			stateSeen[t] = startedAt
+			changed = true
+		}
+	}
+	if changed {
+		saveLocked()
+		log.Printf("recorded startup watermark for new topic(s)")
+	}
 }
 
 // markSeen records a message timestamp and persists the state file.
