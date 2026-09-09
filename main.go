@@ -9,9 +9,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -38,9 +41,10 @@ var iconBlank []byte
 var unseen atomic.Int32
 
 var (
-	server = flag.String("server", "https://ntfy.sh", "ntfy server URL")
-	topics = flag.String("topics", "", "comma-separated ntfy topics to subscribe (required)")
-	token  = flag.String("token", "", "ntfy access token (tk_...) for protected topics")
+	server  = flag.String("server", "https://ntfy.sh", "ntfy server URL")
+	topics  = flag.String("topics", "", "comma-separated ntfy topics to subscribe (required)")
+	token   = flag.String("token", "", "ntfy access token (tk_...) for protected topics")
+	logPath = flag.String("log", "", "log file path (default: ntfy-tray-<timestamp>.log next to the exe)")
 )
 
 type ntfyMessage struct {
@@ -57,11 +61,36 @@ type ntfyMessage struct {
 
 func main() {
 	flag.Parse()
+	initLog()
 	if *topics == "" {
 		log.Fatal("-topics is required, e.g. -topics=mytopic,alerts")
 	}
+	log.Printf("starting ntfy-tray: server=%s topics=%s", *server, *topics)
 	initState()
 	systray.Run(onReady, onExit)
+}
+
+// exeDir returns the directory containing the executable ("." on error).
+func exeDir() string {
+	if exe, err := os.Executable(); err == nil {
+		return filepath.Dir(exe)
+	}
+	return "."
+}
+
+// initLog redirects the standard logger to the log file (and stderr, which
+// is only visible in non-windowsgui debug builds).
+func initLog() {
+	p := *logPath
+	if p == "" {
+		p = filepath.Join(exeDir(), "ntfy-tray-"+time.Now().Format("20060102-150405")+".log")
+	}
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("cannot open log file %s: %v (logging to stderr only)", p, err)
+		return
+	}
+	log.SetOutput(io.MultiWriter(os.Stderr, f))
 }
 
 func onReady() {

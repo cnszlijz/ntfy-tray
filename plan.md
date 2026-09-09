@@ -40,14 +40,21 @@ Windows 常驻托盘程序：订阅 ntfy.sh topic，收到消息时弹出 Window
 
 ### 托盘
 
-- 图标：`icon.ico`（32×32，程序内 `go:embed`）。
+- 图标：`icon.ico`（32×32，程序内 `go:embed`）：透明背景 + 抗锯齿圆点（半径 13/16）。
 - 菜单：`Open ntfy`（浏览器打开 topic 页面）、`Quit`。
 - **闪烁**：有未确认通知时图标以 500ms 间隔在 `icon.ico` / `icon_blank.ico` 间切换。**左键单击仅消除闪烁（不弹菜单）**；右键单击消除闪烁并弹出菜单。上游 systray 无图标点击回调 → 库已 vendor 到 `internal/systray` 并打补丁新增 `SetOnTrayClick`（WndProc 的 `WM_LBUTTONUP` 分支只触发回调，`WM_RBUTTONUP` 分支触发回调 + `showMenu()`），go.mod 用 `replace` 指向本地副本。
+- **`icon_blank.ico` 透明陷阱**：Windows 仅当 32bpp 图标存在非零 alpha 字节时才走 alpha 通道；全 0 alpha 会回退到 AND 掩码渲染成黑块。修复：AND 掩码全置 1（1=透明），两条渲染路径都透明。
+
+### 日志
+
+- `-log` 指定路径，默认 exe 同目录 `ntfy-tray-<yyyymmdd-hhmmss>.log`；追加模式。
+- 输出为 `io.MultiWriter(文件, stderr)`：无窗口版只落文件，console 调试版两边都有。
+- 打开失败降级为仅 stderr，不崩溃。
 
 ## 运行参数
 
 ```
-ntfy-tray.exe -topics=mytopic,alerts [-server=https://ntfy.sh] [-token=tk_xxx]
+ntfy-tray.exe -topics=mytopic,alerts [-server=https://ntfy.sh] [-token=tk_xxx] [-log=path]
 ```
 
 ## 构建
@@ -60,10 +67,14 @@ go build -ldflags "-H=windowsgui" -o ntfy-tray.exe .
 
 ## 状态
 
-- [x] main.go（流订阅 / 重连 / watchdog / toast / 托盘 / 图标闪烁）
+- [x] main.go（流订阅 / 重连 / watchdog / toast / 托盘 / 图标闪烁 / 日志文件）
 - [x] state.go（断线续传）
-- [x] icon.ico / icon_blank.ico 生成
+- [x] icon.ico（透明背景 + 抗锯齿圆点）/ icon_blank.ico（全透明，AND 掩码全 1）
 - [x] go.mod 依赖（systray → `internal/systray` vendor 补丁版，toast.v1）
 - [x] 编译通过（`ntfy-tray.exe`，windowsgui 无窗口）
 - [x] 端到端验证：在线收 M1 → 写状态 → 离线收 M2 → 重启仅补推 M2，无重复推送，水印推进正确
+- [x] 点击行为验证：左键仅确认不弹菜单（`#32768` 缺席断言），右键确认 + 弹菜单
+- [x] `-log` 验证：默认时间戳文件名 / 自定义路径均正确写入
+- [x] README.md（使用方法）
 - [ ] 开机自启（注册表 `HKCU\...\Run` 或启动文件夹快捷方式，待决定是否内置）
+- [ ] state 文件路径可配置（目前固定 exe 目录，非管理员运行 `C:\Program Files` 下可能无写权限）

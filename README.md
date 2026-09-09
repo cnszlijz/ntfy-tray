@@ -21,6 +21,7 @@ ntfy-tray.exe -topics=mytopic,alerts
 | `-topics` | （必填） | 订阅的 topic，多个用英文逗号分隔 |
 | `-server` | `https://ntfy.sh` | ntfy 服务器地址，自建服务器改这里 |
 | `-token` | 空 | 访问受保护 topic 的 token（`tk_...`，在 ntfy 网页端生成） |
+| `-log` | `ntfy-tray-<时间戳>.log`（exe 同目录） | 日志文件路径；日志同时写入文件，追加模式 |
 
 示例 —— 订阅自建服务器上的受保护 topic：
 

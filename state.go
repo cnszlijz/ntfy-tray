@@ -28,11 +28,7 @@ type stateFile struct {
 }
 
 func initState() {
-	dir := "."
-	if exe, err := os.Executable(); err == nil {
-		dir = filepath.Dir(exe)
-	}
-	statePath = filepath.Join(dir, stateFileName)
+	statePath = filepath.Join(exeDir(), stateFileName)
 
 	b, err := os.ReadFile(statePath)
 	if err != nil {
