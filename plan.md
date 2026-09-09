@@ -48,7 +48,7 @@ Windows 常驻托盘程序：订阅 ntfy.sh topic，收到消息时弹出 Window
 ### 日志
 
 - `-log` 指定路径，默认 exe 同目录 `ntfy-tray-<yyyymmdd-hhmmss>.log`；追加模式。
-- 输出为 `io.MultiWriter(文件, stderr)`：无窗口版只落文件，console 调试版两边都有。
+- 输出为 `io.MultiWriter(文件, stderr)`，**文件必须在前**：MultiWriter 遇第一个出错 writer 即中断，windowsgui 构建中 stderr 是无效句柄，写它必报错；若 stderr 在前则文件永远写不进去（GUI 启动日志为空、console 启动正常，极具迷惑性）。
 - 打开失败降级为仅 stderr，不崩溃。
 
 ## 运行参数

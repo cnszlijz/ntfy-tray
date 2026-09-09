@@ -91,7 +91,11 @@ func initLog() {
 		log.Printf("cannot open log file %s: %v (logging to stderr only)", p, err)
 		return
 	}
-	log.SetOutput(io.MultiWriter(os.Stderr, f))
+	// File first: io.MultiWriter stops at the first failing writer, and in
+	// windowsgui builds stderr is an invalid handle whose write error must
+	// not prevent the file write.
+	log.SetOutput(io.MultiWriter(f, os.Stderr))
+	log.Printf("logging to %s", p)
 }
 
 func onReady() {
